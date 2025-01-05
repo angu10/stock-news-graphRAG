@@ -919,7 +919,7 @@ class SnowflakeOperations:
                     for msg in messages
                     if msg.get("role") == "assistant" and "references" in msg
                 ]
-                relevant_charts = get_relevant_charts(messages)
+                
 
                 # Sanitize and prepare context
                 def sanitize_text(text):
@@ -941,14 +941,6 @@ class SnowflakeOperations:
                         }
                         for msg in relevant_messages
                     ],
-                    "charts": [
-                        {
-                            "title": sanitize_text(chart["title"]),
-                            "description": sanitize_text(chart["description"]),
-                            "type": chart["type"]
-                        }
-                        for chart in relevant_charts
-                    ]
                 }
 
                 prompt = f"""
@@ -1006,7 +998,7 @@ class SnowflakeOperations:
                 result = json.loads(json_cleanup(cursor.fetchone()[0]))
 
                 # Add charts to result
-                result["charts"] = relevant_charts
+                #result["charts"] = relevant_charts
                 return result
 
         except Exception as e:
