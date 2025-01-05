@@ -278,14 +278,20 @@ def process_query_with_graph(query: str, context: Dict) -> Dict:
             cursor.execute(
                 """
                 SELECT SNOWFLAKE.CORTEX.COMPLETE(
-                    'mistral-large2',
-                    %s
-                )
+                        'mistral-large2',
+                        [{
+                        'role': 'user',
+                        'content': %s}],
+                        {
+                            'max_tokens': 8192
+                        }
+                    )
             """,
                 (prompt,),
             )
 
-            result = json.loads(json_cleanup(cursor.fetchone()[0]))
+            results = json.loads(json_cleanup(cursor.fetchone()[0]))
+            result = json.loads(results["choices"][0]["messages"])
 
             # Verify inline citations exist and match references
             references = result.get("references", [])
@@ -833,21 +839,21 @@ if st.sidebar.button("Generate Consolidated Content"):
                 with col2:
                     # Download button for markdown
                     markdown_content = (
-                        f"# {content['title']}\n\n"
+                        f"# {content.get('title')}\n\n"
                         f"## Executive Summary\n"
-                        f"{content['summary']}\n\n"
+                        f"{content.get('summary')}\n\n"
                         f"## Key Findings\n"
                         + "\n".join(
-                            f"- {finding}" for finding in content["key_findings"]
+                            f"- {finding}" for finding in content.get("key_findings")
                         )
                         + "\n\n"
                         f"## Analysis\n"
-                        f"{content['content']}\n\n"
+                        f"{content.get('content')}\n\n"
                         f"## Key Entity Relationships\n"
                         + "\n".join(
-                            f"### {entity['entity']}\n"
-                            + "\n".join(f"- {r}" for r in entity["relationships"])
-                            for entity in content["entity_relationships"]
+                            f"### {entity.get('entity')}\n"
+                            + "\n".join(f"- {r}" for r in entity.get("relationships"))
+                            for entity in content.get("entity_relationships")
                         )
                         + "\n\n"
                         f"## References\n"
