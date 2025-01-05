@@ -921,24 +921,34 @@ class SnowflakeOperations:
                 ]
                 relevant_charts = get_relevant_charts(messages)
 
-                # Prepare context
+                # Sanitize and prepare context
+                def sanitize_text(text):
+                    if isinstance(text, str):
+                        # Remove control characters and ensure valid JSON string
+                        return ' '.join(text.split()).replace('\n', ' ').replace('\r', ' ')
+                    return text
+
+                def sanitize_dict(d):
+                    return {k: sanitize_text(v) if isinstance(v, str) else v for k, v in d.items()}
+
+                # Prepare sanitized context
                 context = {
                     "messages": [
                         {
-                            "content": msg["content"],
-                            "references": msg["references"],
-                            "key_entities": msg.get("key_entities", []),
+                            "content": sanitize_text(msg["content"]),
+                            "references": [sanitize_dict(ref) for ref in msg["references"]],
+                            "key_entities": [sanitize_dict(entity) for entity in msg.get("key_entities", [])]
                         }
                         for msg in relevant_messages
                     ],
                     "charts": [
                         {
-                            "title": chart["title"],
-                            "description": chart["description"],
-                            "type": chart["type"],
+                            "title": sanitize_text(chart["title"]),
+                            "description": sanitize_text(chart["description"]),
+                            "type": chart["type"]
                         }
                         for chart in relevant_charts
-                    ],
+                    ]
                 }
 
                 prompt = f"""
