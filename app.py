@@ -609,12 +609,19 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+
+st.warning("📅 Data Coverage: Limited to last 30 days only", icon="⚠️")
+
 # Add a description of what the app does
 st.markdown(
     """
 Ask questions about news and market trends related to the Magnificent Seven - 
 the most influential tech companies driving market growth. Get insights about Apple, 
 Microsoft, Alphabet, Amazon, NVIDIA, Meta, and Tesla.
+**Note**: 
+- News data is limited to the last 30 days
+- Only covers the Magnificent Seven stocks
+- For other stocks or historical data, please use financial data providers
 """
 )
 
