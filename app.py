@@ -499,6 +499,47 @@ def display_trending_questions():
                 st.session_state.messages.append(
                     {"role": "user", "content": question["query"]}
                 )
+                # Get cached response or process new query
+                cached_response = snowflake_ops.get_cached_response(question["query"])
+                
+                if cached_response:
+                    if isinstance(cached_response, str):
+                        best_response = json.loads(cached_response)
+                    else:
+                        best_response = cached_response
+                        
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": best_response["answer"],
+                        "references": best_response.get("references", []),
+                        "key_entities": best_response.get("key_entities", [])
+                    })
+                else:
+                    # Process query
+                    query_analysis = {"refined_questions": []} if not st.session_state.pro_search else snowflake_ops.generate_refined_queries(question["query"])
+                    best_response, all_responses = process_all_queries(question["query"], query_analysis)
+                    
+                    # Generate follow-up questions if pro search is enabled
+                    if st.session_state.pro_search:
+                        follow_up_questions = generate_follow_up_questions(best_response["answer"], question["query"])
+                        st.session_state.suggested_questions = follow_up_questions
+                    
+                    # Cache the response
+                    cache_data = {
+                        "answer": best_response["answer"],
+                        "references": best_response["references"],
+                        "key_entities": best_response.get("key_entities", []),
+                    }
+                    snowflake_ops.cache_query_response(question["query"], cache_data)
+                    
+                    # Add response to messages
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": best_response["answer"],
+                        "references": best_response["references"],
+                        "key_entities": best_response.get("key_entities", [])
+                    })
+                
                 st.rerun()
 
 
