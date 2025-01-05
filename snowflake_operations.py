@@ -951,6 +951,7 @@ class SnowflakeOperations:
                 4. Integrates relevant charts and visualizations appropriately
                 5. Includes a summary section at the start
                 6. Lists key entities and their relationships
+                7. Give only top 10 references
                 
                 Chat Context: {json.dumps(context)}
                 
@@ -989,13 +990,18 @@ class SnowflakeOperations:
                     """
                     SELECT SNOWFLAKE.CORTEX.COMPLETE(
                         'mistral-large2',
-                        %s
+                        [{
+                        'role': 'user',
+                        'content': %s}],
+                        {
+                            'max_tokens': 8192
+                        }
                     )
                     """,
                     (prompt,),
                 )
-
-                result = json.loads(json_cleanup(cursor.fetchone()[0]))
+                results = json.loads(json_cleanup(cursor.fetchone()[0]))
+                result = json.loads(results["choices"][0]["messages"])
 
                 # Add charts to result
                 #result["charts"] = relevant_charts
