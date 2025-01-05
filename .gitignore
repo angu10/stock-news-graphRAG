@@ -7,3 +7,4 @@ graph_rag_schema.sql
 *.log
 
 features.txt
+.gitignore
