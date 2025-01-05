@@ -1010,6 +1010,89 @@ class SnowflakeOperations:
         except Exception as e:
             st.error(f"Error generating consolidated content: {str(e)}")
             return None
+        
+    def classify_question_type(self, question: str) -> str:
+        """Classify if a question is asking about sentiment or general information"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"USE DATABASE \"{self.conn_params['database']}\"")
+                cursor.execute(f"USE SCHEMA \"{self.conn_params['schema']}\"")
+                
+                prompt = f"""
+                Classify if this question is asking about market sentiment/mood/feeling or general information:
+                Question: {question}
+                
+                Return only one of these categories:
+                - SENTIMENT (if asking about market mood, feeling, sentiment, outlook, reaction)
+                - GENERAL (for all other types of questions)
+                
+                Return the classification as a single word (SENTIMENT or GENERAL).
+                """
+                
+                cursor.execute(
+                    """
+                    SELECT SNOWFLAKE.CORTEX.COMPLETE(
+                        'mistral-large2',
+                        %s
+                    )
+                    """,
+                    (prompt,),
+                )
+                
+                result = cursor.fetchone()[0].strip().upper()
+                return "SENTIMENT" if "SENTIMENT" in result else "GENERAL"
+                
+        except Exception as e:
+            logger.error(f"Error classifying question: {str(e)}")
+            return "GENERAL"
+
+    def analyze_sentiment(self, text: str) -> Dict:
+        """Analyze sentiment using Snowflake Cortex"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"USE DATABASE \"{self.conn_params['database']}\"")
+                cursor.execute(f"USE SCHEMA \"{self.conn_params['schema']}\"")
+                
+                # Use Snowflake Cortex for sentiment analysis
+                cursor.execute(
+                    """
+                    SELECT SNOWFLAKE.CORTEX.COMPLETE(
+                        'mistral-large2',
+                        %s
+                    )
+                    """,
+                    (f"""
+                    Analyze the market sentiment in this text and provide:
+                    1. Overall sentiment (positive, negative, or neutral)
+                    2. Confidence score (0-1)
+                    3. Key sentiment drivers
+                    4. Market implications
+                    
+                    Text: {text}
+                    
+                    Return in this JSON format:
+                    {{
+                        "sentiment": "positive|negative|neutral",
+                        "confidence": confidence_score,
+                        "sentiment_drivers": ["list", "of", "key", "factors"],
+                        "market_implications": "detailed analysis of market implications"
+                    }}
+                    """,),
+                )
+                
+                result = json.loads(json_cleanup(cursor.fetchone()[0]))
+                return result
+                
+        except Exception as e:
+            logger.error(f"Error analyzing sentiment: {str(e)}")
+            return {
+                "sentiment": "neutral",
+                "confidence": 0,
+                "sentiment_drivers": [],
+                "market_implications": "Error analyzing sentiment"
+            }
 
     def show_article_contents(self, link: str, ref_idx: str):
         try:
