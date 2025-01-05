@@ -923,7 +923,7 @@ if st.sidebar.button("Generate Consolidated Content"):
                         f"{content.get('summary')}\n\n"
                         f"## Key Findings\n"
                         + "\n".join(
-                            f"- {finding}" for finding in content.get("key_findings")
+                            f"- {finding}" for finding in content.get("key_findings","N/A")
                         )
                         + "\n\n"
                         f"## Analysis\n"
