@@ -167,6 +167,30 @@ st.markdown(
         font-size: 0.8em;
         color: #666;
     }
+    .sentiment-box {
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    .sentiment-positive {
+        background-color: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+    .sentiment-negative {
+        background-color: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .sentiment-neutral {
+        background-color: rgba(234, 179, 8, 0.1);
+        border: 1px solid rgba(234, 179, 8, 0.2);
+    }
+    .sentiment-driver {
+        background-color: rgba(59, 130, 246, 0.1);
+        padding: 4px 8px;
+        border-radius: 4px;
+        display: inline-block;
+        margin: 2px;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -221,58 +245,84 @@ def handle_suggested_question(question: str):
     st.rerun()
 
 
-def process_query_with_graph(query: str, context: Dict) -> Dict:
+def process_query_with_graph(query: str, context: Dict,is_original_query: bool = False) -> Dict:
     """Process query using knowledge graph data and news context with inline references"""
     try:
         with snowflake_ops._get_connection() as conn:
             cursor = conn.cursor()
 
+            # First, classify the question type
+            question_type = "GENERAL"
+            if is_original_query:
+                #st.write(f"is_original_query {is_original_query}")
+                question_type = snowflake_ops.classify_question_type(query)
+
             # Extract entities and relationships from the query
             graph_data = snowflake_ops.query_graph(query)
 
-            prompt = f"""
+            # Base prompt for both types
+            base_prompt = f"""
             Analyze this question using both news articles and knowledge graph data:
             
             Question: {query}
             News Context: {context.get('news_context', '')}
             Graph Analysis: {graph_data}
+            """
+            if question_type == "SENTIMENT":
+                # For sentiment questions, add sentiment-specific instructions
+                prompt = base_prompt + """
+                Provide a comprehensive answer that focuses on market sentiment and includes:
+                1. Overall market mood and sentiment
+                2. Key factors driving the sentiment
+                3. Recent sentiment shifts or trends
+                4. Market implications
+                5. Use inline citations in format [1], [2], etc.
+                
+                IMPORTANT: 
+                1. For EVERY piece of information from a source, include an inline citation like [1], [2], etc.
+                2. For each reference, provide both a relevance_score and a confidence_score
+                """
+            else:
+                # For general questions, use standard instructions
+                prompt = base_prompt + """
             
-            Provide a comprehensive answer that:
-            1. Addresses the main question
-            2. Incorporates relevant entity relationships
-            3. Uses inline citations in format [1], [2], etc. when referencing specific information
-            4. Highlights key insights
-            5. Includes market sentiment
-            
-            IMPORTANT: 
-            1. For EVERY piece of information from a source, include an inline citation like [1], [2], etc.
-            2.For each reference, provide both a relevance_score (how relevant the source is to the query)
-              and a confidence_score (how confident you are in the source's information)
-            
-            Format the response in this JSON structure:
-            {{
-                "answer": "detailed_answer_with_[1]_style_inline_citations",
-                "key_entities": [
-                    {{
-                        "name": "entity_name",
-                        "type": "entity_type",
-                        "relevance": "explanation_of_relevance"
-                    }}
-                ],
-                "references": [
-                    {{
-                        "title": "article_title",
-                        "source": "source_name",
-                        "date": "publication_date",
-                        "link": "article_link",
-                        "relevance_score": score,
-                        "confidence_score": score_between_0_and_1,
-                    }}
-                ],
-                "confidence_score": confidence_between_0_and_1
-            }}
-            
-            Ensure that every reference in the references list is cited at least once in the answer text using [n] format.
+                Provide a comprehensive answer that:
+                1. Addresses the main question
+                2. Incorporates relevant entity relationships
+                3. Uses inline citations in format [1], [2], etc. when referencing specific information
+                4. Highlights key insights
+                5. Includes market sentiment
+                
+                IMPORTANT: 
+                1. For EVERY piece of information from a source, include an inline citation like [1], [2], etc.
+                2.For each reference, provide both a relevance_score (how relevant the source is to the query)
+                and a confidence_score (how confident you are in the source's information)
+                """
+            prompt += """
+                Format the response in this JSON structure:
+                {{
+                    "answer": "detailed_answer_with_[1]_style_inline_citations",
+                    "key_entities": [
+                        {{
+                            "name": "entity_name",
+                            "type": "entity_type",
+                            "relevance": "explanation_of_relevance"
+                        }}
+                    ],
+                    "references": [
+                        {{
+                            "title": "article_title",
+                            "source": "source_name",
+                            "date": "publication_date",
+                            "link": "article_link",
+                            "relevance_score": score,
+                            "confidence_score": score_between_0_and_1,
+                        }}
+                    ],
+                    "confidence_score": confidence_between_0_and_1
+                }}
+                
+                Ensure that every reference in the references list is cited at least once in the answer text using [n] format.
             """
 
             cursor.execute(
@@ -292,6 +342,11 @@ def process_query_with_graph(query: str, context: Dict) -> Dict:
 
             results = json.loads(json_cleanup(cursor.fetchone()[0]))
             result = json.loads(results["choices"][0]["messages"])
+
+            # For sentiment questions, add sentiment analysis
+            if question_type == "SENTIMENT":
+                sentiment_result = snowflake_ops.analyze_sentiment(result["answer"])
+                result["sentiment_analysis"] = sentiment_result
 
             # Verify inline citations exist and match references
             references = result.get("references", [])
@@ -315,21 +370,21 @@ def process_query_with_graph(query: str, context: Dict) -> Dict:
         }
 
 
-async def process_query_with_graph_async(query: str, context: Dict) -> Dict:
+async def process_query_with_graph_async(query: str, context: Dict,is_original_query: bool = False) -> Dict:
     """Asynchronous wrapper for process_query_with_graph"""
     # Create new event loop for the async operation
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, process_query_with_graph, query, context)
+    return await loop.run_in_executor(None, process_query_with_graph, query, context,is_original_query)
 
 
 async def process_queries_parallel(
-    queries: List[str], context: Dict, status
+    queries: List[str], context: Dict, status,original_query: str
 ) -> List[Dict]:
     """Process multiple queries in parallel"""
     tasks = []
     for i, query in enumerate(queries):
         status.update(label=f"🔄 Processing query {i+1}/{len(queries)}...")
-        task = process_query_with_graph_async(query, context)
+        task = process_query_with_graph_async(query, context, is_original_query=(query == original_query))
         tasks.append(task)
 
     return await asyncio.gather(*tasks)
@@ -349,7 +404,7 @@ async def process_all_queries_async(
 
     # Process all queries in parallel
     status.update(label="📝 Processing queries in parallel...")
-    responses = await process_queries_parallel(all_queries, context, status)
+    responses = await process_queries_parallel(all_queries, context, status,original_query)
 
     # Format responses
     all_responses = [
@@ -647,6 +702,30 @@ for message in st.session_state.messages:
                 message["content"], message["references"]
             )
             st.markdown(formatted_content, unsafe_allow_html=True)
+
+            # Display sentiment analysis if available
+            if "sentiment_analysis" in message:
+                sentiment = message["sentiment_analysis"]
+                sentiment_class = f"sentiment-{sentiment['sentiment'].lower()}"
+                
+                st.markdown(
+                    f"""
+                    <div class="sentiment-box {sentiment_class}">
+                        <h3>📊 Market Sentiment Analysis</h3>
+                        <p><strong>Overall Sentiment:</strong> {sentiment['sentiment'].title()} 
+                        (Confidence: {sentiment['confidence']:.0%})</p>
+                        
+                        <p><strong>Key Sentiment Drivers:</strong></p>
+                        <div>
+                            {"".join([f'<span class="sentiment-driver">{driver}</span>' for driver in sentiment['sentiment_drivers']])}
+                        </div>
+                        
+                        <p><strong>Market Implications:</strong><br>
+                        {sentiment['market_implications']}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
             st.markdown('<div class="references-section">', unsafe_allow_html=True)
             st.markdown("### 📚 References")
