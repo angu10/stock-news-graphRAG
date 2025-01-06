@@ -918,28 +918,27 @@ if st.sidebar.button("Generate Consolidated Content"):
                 with col2:
                     # Download button for markdown
                     markdown_content = (
-                        f"# {content.get('title')}\n\n"
-                        f"## Executive Summary\n"
-                        f"{content.get('summary')}\n\n"
-                        f"## Key Findings\n"
-                        + "\n".join(
-                            f"- {finding}" for finding in content.get("key_findings","N/A")
-                        )
-                        + "\n\n"
-                        f"## Analysis\n"
-                        f"{content.get('content')}\n\n"
-                        f"## Key Entity Relationships\n"
-                        + "\n".join(
-                            f"### {entity.get('entity',"NA")}\n"
-                            + "\n".join(f"- {r}" for r in entity.get("relationships"))
-                            for entity in content.get("entity_relationships","N/A")
-                        )
-                        + "\n\n"
-                        f"## References\n"
-                        + "\n".join(
-                            f"{ref['id']}. [{ref['title']}]({ref['link']}) - {ref['source']}, {ref['date']}"
-                            for ref in content["references"]
-                        )
+                    f"# {content.get('title')}\n\n"
+                    f"## Executive Summary\n"
+                    f"{content.get('summary')}\n\n"
+                    f"## Key Findings\n"
+                    + "\n".join(f"- {finding}" for finding in content.get('key_findings', [])) 
+                    + "\n\n"
+                    f"## Analysis\n"
+                    f"{content.get('content')}\n\n"
+                    f"## Key Entity Relationships\n"
+                    + "\n".join(
+                        f"### {entity.get('entity', 'N/A')}\n"
+                        + "\n".join(f"- {r}" for r in entity.get('relationships', []))
+                        + "\n"
+                        for entity in content.get('entity_relationships', [])
+                    )
+                    + "\n"
+                    f"## References\n"
+                    + "\n".join(
+                        f"{ref['id']}. [{ref['title']}]({ref['link']}) - {ref['source']}, {ref['date']}"
+                        for ref in content.get('references', [])
+                    )
                     )
 
                     st.download_button(
