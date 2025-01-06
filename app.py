@@ -932,7 +932,7 @@ if st.sidebar.button("Generate Consolidated Content"):
                         + "\n".join(
                             f"### {entity.get('entity')}\n"
                             + "\n".join(f"- {r}" for r in entity.get("relationships"))
-                            for entity in content.get("entity_relationships")
+                            for entity in content.get("entity_relationships","N/A")
                         )
                         + "\n\n"
                         f"## References\n"
