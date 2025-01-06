@@ -930,7 +930,7 @@ if st.sidebar.button("Generate Consolidated Content"):
                         f"{content.get('content')}\n\n"
                         f"## Key Entity Relationships\n"
                         + "\n".join(
-                            f"### {entity.get('entity')}\n"
+                            f"### {entity.get('entity',"NA")}\n"
                             + "\n".join(f"- {r}" for r in entity.get("relationships"))
                             for entity in content.get("entity_relationships","N/A")
                         )
